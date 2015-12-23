@@ -39,6 +39,19 @@ If the data written already exists in the database, then
  it will be de-duplicated on the fly.  The new data won't
   actually be stored; the old copy will be retained instead.
 
+All synchronisation is done via the database, so the library
+ is multi-machine safe.
+
+
+Limitations
+-----------
+
+ * Maximum object size: Unlimited.
+ * Maximum objects (after deduplication): Over 2 billion.
+ * Maximum filenames and metadata: Unlimited.
+ * Maximum key length: About 1GB.
+ * Maximum metadata storage: About 1GB.
+
 
 Schema
 ------
@@ -53,6 +66,53 @@ Note that `BLOB`s do not exist *in* schemas or tables in
  or `TRUNCATE TABLE`, or even `DELETE FROM TABLE`.  There
  are methods on BlobStore to delete things safely.
  `DROP DATABASE` is also sufficient.
+
+
+Metadata Storage
+----------------
+
+The schema and filesystem abstraction code has space for
+ carrying around a single VARCHAR of "extra" metadata,
+ and machinery for serialising and deserialising it.
+
+An example serialiser is provided in `JsonMapper.java`,
+ which is not on the main classpath to avoid a `Jackson`
+ dependency.
+
+```java
+  public class MyMetadata {
+    public List<String> headers;
+  }
+
+  new BlobStore<>(
+    HashedBlobStorage.forDatasource(ds),
+    new JsonMapper().jsonStringer(
+      new TypeReference<MyMetadata>() {}
+    )
+  ).read("key", (is, myMetadata) -> {
+     myMetadata.headers...
+  });
+```
+
+
+Deduplication
+-------------
+
+The deduplication is done based on a 128-bit truncation of
+ plain `SHA-256` on the uncompressed data.  The chance of
+ a false positive (claiming there's a collision when there
+ is not) is around `1-in-10^18` if you have four billion
+ objects stored.
+
+ It is not currently believed that any attacker would be
+ able to generate a collision in `SHA-256` except for by
+ brute force, which would currently take indefeasibly long.
+
+ It should not be hard to extend the amount of the hash
+ that is used, nor to switch to a more resiliant hash
+ scheme.  If you want either of these, however, you probably
+ don't want deduplication and should use different code.
+
 
 Testing
 -------
