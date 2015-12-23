@@ -1,6 +1,9 @@
 package com.goeswhere.bloboperations;
 
-import com.goeswhere.bloboperations.util.*;
+import com.goeswhere.bloboperations.util.CountingOutputStream;
+import com.goeswhere.bloboperations.util.InputStreamConsumer;
+import com.goeswhere.bloboperations.util.NewLargeObject;
+import com.goeswhere.bloboperations.util.VoidOutputStreamConsumer;
 import org.postgresql.PGConnection;
 import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
@@ -10,6 +13,7 @@ import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.transaction.support.TransactionOperations;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -28,7 +32,7 @@ public class HashedBlobStorage {
         this.transaction = transaction;
     }
 
-    HashedBlob insert(VoidOutputStreamConsumer stream) {
+    public HashedBlob insert(VoidOutputStreamConsumer stream) {
         return transaction.execute(status -> {
             final HashedBlob stored = jdbc.execute((Connection conn) -> {
                 try (final NewLargeObject largeObject = new NewLargeObject(api(conn))) {
@@ -54,7 +58,7 @@ public class HashedBlobStorage {
         });
     }
 
-    <T> T read(UUID uuid, InputStreamConsumer<T> consumer) throws IncorrectResultSizeDataAccessException {
+    public <T> T read(UUID uuid, InputStreamConsumer<T> consumer) throws IncorrectResultSizeDataAccessException {
         return transaction.execute(status -> {
             final long oid = jdbc.queryForObject("SELECT loid FROM blob WHERE hash=?", new Object[]{uuid}, Long.class);
             return jdbc.execute((Connection conn) -> {
@@ -87,7 +91,7 @@ public class HashedBlobStorage {
                 countingToDb.flush();
 
                 return new HashedBlob(
-                        Hash.uuid(digest.digest()),
+                        uuid(digest.digest()),
                         countingToDb.getCount(),
                         countingFromCaller.getCount(),
                         largeObject.getOid());
@@ -108,5 +112,10 @@ public class HashedBlobStorage {
 
     private static LargeObjectManager api(Connection conn) throws SQLException {
         return conn.unwrap(PGConnection.class).getLargeObjectAPI();
+    }
+
+    private static UUID uuid(byte[] bytes) {
+        final ByteBuffer buffer = ByteBuffer.wrap(bytes);
+        return new UUID(buffer.getLong(), buffer.getLong());
     }
 }
