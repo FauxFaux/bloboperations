@@ -4,6 +4,8 @@ import com.goeswhere.bloboperations.util.CountingOutputStream;
 import com.goeswhere.bloboperations.util.InputStreamConsumer;
 import com.goeswhere.bloboperations.util.NewLargeObject;
 import com.goeswhere.bloboperations.util.VoidOutputStreamConsumer;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.postgresql.PGConnection;
 import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
@@ -23,6 +25,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public class HashedBlobStorage {
+    private static final Log logger = LogFactory.getLog(HashedBlobStorage.class);
+
     final JdbcOperations jdbc;
     final TransactionOperations transaction;
 
@@ -35,12 +39,7 @@ public class HashedBlobStorage {
         return transaction.execute(status -> {
             final HashedBlob stored = jdbc.execute((Connection conn) -> {
                 try (final NewLargeObject largeObject = new NewLargeObject(api(conn))) {
-                    try {
-                        return writeGeneratingMeta(stream, largeObject);
-                    } catch (Throwable t) {
-                        t.printStackTrace();
-                        throw t;
-                    }
+                    return writeGeneratingMeta(stream, largeObject);
                 }
             });
 
@@ -56,7 +55,7 @@ public class HashedBlobStorage {
                     stored.uuid, stored.storedLength, stored.originalLength, stored.oid, stored.uuid);
 
             if (updated != 1) {
-                System.err.println("we didn't actually get to do the insert; must have already existed");
+                logger.info("we didn't actually get to do the insert; must have already existed: " + stored.uuid);
             }
 
             return stored;
@@ -72,7 +71,7 @@ public class HashedBlobStorage {
                 try (final GZIPInputStream inputStream = new GZIPInputStream(object.getInputStream())) {
                     return consumer.accept(inputStream);
                 } catch (IOException e) {
-                    throw new IllegalStateException(e);
+                    throw new IllegalStateException("callee's code threw while trying to read", e);
                 } finally {
                     object.close();
                 }

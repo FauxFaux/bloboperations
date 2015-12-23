@@ -3,6 +3,8 @@ package com.goeswhere.bloboperations;
 import com.goeswhere.bloboperations.util.OutputStreamConsumer;
 import com.goeswhere.bloboperations.util.Stringer;
 import com.goeswhere.bloboperations.util.VoidOutputStreamConsumer;
+import org.apache.commons.logging.Log;
+import org.apache.commons.logging.LogFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
@@ -14,6 +16,8 @@ import java.util.NoSuchElementException;
 import java.util.UUID;
 
 public class BlobStore<EX> {
+    private static final Log log = LogFactory.getLog(BlobStore.class);
+
     final HashedBlobStorage storage;
     private final Stringer<EX> serialiseExtra;
 
@@ -27,7 +31,7 @@ public class BlobStore<EX> {
         try {
             storage.jdbc.update("INSERT INTO metadata (key, created) VALUES (?, now())", key);
         } catch (DuplicateKeyException ignored) {
-            // maybe it's null, maybe it's not; who cares
+            log.info("there was a metadata key collision, but it might not be fatal; continuing.  key=" + key);
         }
 
         return storage.transaction.execute(status -> {
@@ -40,11 +44,11 @@ public class BlobStore<EX> {
             }
 
             class Capture implements VoidOutputStreamConsumer {
-                EX ex;
+                EX extra;
 
                 @Override
                 public void accept(OutputStream outputStream) throws IOException {
-                    ex = data.accept(outputStream);
+                    extra = data.accept(outputStream);
                 }
             }
 
@@ -53,17 +57,17 @@ public class BlobStore<EX> {
 
             final int updated = storage.jdbc.update(
                     "UPDATE metadata SET hash=?, extra=? WHERE key=?",
-                    hashed.uuid, serialiseExtra.toString.apply(cap.ex), key);
+                    hashed.uuid, serialiseExtra.toString.apply(cap.extra), key);
 
             if (1 != updated) {
-                throw new IncorrectResultSizeDataAccessException(1, updated);
+                throw new IncorrectResultSizeDataAccessException("couldn't set metadata", 1, updated);
             }
 
-            return cap.ex;
+            return cap.extra;
         });
     }
 
-    private BlobMetadata<EX> metadata(String key) {
+    public BlobMetadata<EX> metadata(String key) {
         // FOR SHARE prevents the row from being deleted, which will prevent
         // (at an application level) the blob from being deleted before we read it
         return storage.jdbc.queryForObject(
