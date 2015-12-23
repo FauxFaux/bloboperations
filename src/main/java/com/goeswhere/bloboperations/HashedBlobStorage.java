@@ -79,6 +79,7 @@ public class HashedBlobStorage {
 
             if (updated != 1) {
                 logger.info("we didn't actually get to do the insert; must have already existed: " + stored.uuid);
+                unlink(stored.oid);
             }
 
             return stored;
@@ -112,9 +113,7 @@ public class HashedBlobStorage {
     public void delete(long storageOid) {
         transaction.execute(status -> {
             // this return value of "1" doesn't seem to be documented, but it seems worth checking
-            if (1 != jdbc.queryForObject("SELECT lo_unlink(?)", new Object[]{storageOid}, Integer.class)) {
-                throw new IllegalStateException("couldn't delete object " + storageOid);
-            }
+            unlink(storageOid);
 
             final int update = jdbc.update("DELETE FROM " + blobTableName + " WHERE loid=?", storageOid);
             if (1 != update) {
@@ -123,6 +122,12 @@ public class HashedBlobStorage {
 
             return null;
         });
+    }
+
+    private void unlink(long storageOid) {
+        if (1 != jdbc.queryForObject("SELECT lo_unlink(?)", new Object[]{storageOid}, Integer.class)) {
+            throw new IllegalStateException("couldn't delete object " + storageOid);
+        }
     }
 
     private static HashedBlob writeGeneratingMeta(VoidOutputStreamConsumer stream, NewLargeObject largeObject) throws SQLException {

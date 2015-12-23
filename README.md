@@ -39,6 +39,7 @@ If the data written already exists in the database, then
  it will be de-duplicated on the fly.  The new data won't
   actually be stored; the old copy will be retained instead.
 
+
 Schema
 ------
 
@@ -51,6 +52,7 @@ Note that `BLOB`s do not exist *in* schemas or tables in
  PostgreSQL, so you can't clean them up with `DROP SCHEMA`,
  or `TRUNCATE TABLE`, or even `DELETE FROM TABLE`.  There
  are methods on BlobStore to delete things safely.
+ `DROP DATABASE` is also sufficient.
 
 Testing
 -------
