@@ -117,10 +117,10 @@ The deduplication is done based on a 128-bit truncation of
 
  It is not currently believed that any attacker would be
  able to generate a collision in `SHA-256` except for by
- brute force, which would currently take indefeasibly long.
+ brute force, which would currently take infeasibly long.
 
  It should not be hard to extend the amount of the hash
- that is used, nor to switch to a more resiliant hash
+ that is used, nor to switch to a more resilient hash
  scheme.  If you want either of these, however, you probably
  don't want deduplication and should use different code.
 
