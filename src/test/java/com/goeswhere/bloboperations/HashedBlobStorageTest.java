@@ -16,23 +16,13 @@ import static junit.framework.Assert.assertEquals;
 import static junit.framework.Assert.assertNull;
 import static org.junit.Assert.assertArrayEquals;
 
-public class HashedBlobStorageTest {
+public class HashedBlobStorageTest extends DatabaseConnectionHelper {
 
     private static final int EOF = -1;
 
-    static DataSource ds;
-    static JdbcTemplate jdbc;
-
-    @BeforeClass
-    public static void connect() {
-        ds = new DriverManagerDataSource("jdbc:postgresql:test");
-        jdbc = new JdbcTemplate(ds);
-        jdbc.execute("TRUNCATE TABLE blob");
-    }
-
     final HashedBlobStorage storage = new HashedBlobStorage(
             jdbc,
-            new TransactionTemplate(new DataSourceTransactionManager(ds)));
+            transactions);
 
     @Test
     public void testInsertEmpty() {

@@ -8,5 +8,6 @@ CREATE TABLE blob (
 CREATE TABLE metadata (
   key     VARCHAR PRIMARY KEY,
   created TIMESTAMPTZ NOT NULL,
+  hash    UUID        NULL,
   extra   VARCHAR     NULL
 );

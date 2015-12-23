@@ -24,8 +24,8 @@ import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public class HashedBlobStorage {
-    private final JdbcOperations jdbc;
-    private final TransactionOperations transaction;
+    final JdbcOperations jdbc;
+    final TransactionOperations transaction;
 
     public HashedBlobStorage(JdbcOperations jdbc, TransactionOperations transaction) {
         this.jdbc = jdbc;
@@ -45,13 +45,19 @@ public class HashedBlobStorage {
                 }
             });
 
-            try {
-                jdbc.update("INSERT INTO blob (hash, stored_length, original_length, loid) VALUES (?, ?, ?, ?)",
-                        stored.uuid, stored.storedLength, stored.originalLength, stored.oid);
-            } catch (DuplicateKeyException ignored) {
-                // Our transaction has errored, so is going to rollback.
-                // Not going to bother to refresh the returned object; the values may be wrong
-                // (the loid certainly is), but they're not really part of our exposed api.
+            // eliminate the race condition on the following "where not exists" clause by...
+            // locking the whole table for write.  Not ideal, but we're expecting the transaction to
+            // terminate quickly after this point, and it's better than random, hard to reproduce errors
+            jdbc.execute("LOCK TABLE blob IN SHARE ROW EXCLUSIVE MODE");
+
+            final int updated = jdbc.update("INSERT INTO blob (hash, stored_length, original_length, loid)" +
+                            "SELECT ?, ?, ?, ? WHERE NOT EXISTS (" +
+                            "  SELECT NULL FROM blob WHERE hash=?" +
+                            ")",
+                    stored.uuid, stored.storedLength, stored.originalLength, stored.oid, stored.uuid);
+
+            if (updated != 1) {
+                System.err.println("we didn't actually get to do the insert; must have already existed");
             }
 
             return stored;
