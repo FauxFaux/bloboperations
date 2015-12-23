@@ -8,6 +8,7 @@ import org.apache.commons.logging.LogFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.time.ZoneOffset;
@@ -24,6 +25,10 @@ public class BlobStore<EX> {
     public BlobStore(HashedBlobStorage storage, Stringer<EX> serialiseExtra) {
         this.storage = storage;
         this.serialiseExtra = serialiseExtra;
+    }
+
+    public static <T> BlobStore<T> forDatasource(DataSource ds) {
+        return new BlobStore<>(HashedBlobStorage.forDatasource(ds), Stringer.alwaysNull());
     }
 
     public EX store(String key, OutputStreamConsumer<EX> data) {

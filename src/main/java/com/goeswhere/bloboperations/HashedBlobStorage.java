@@ -11,8 +11,12 @@ import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.jdbc.core.JdbcOperations;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.jdbc.datasource.DataSourceTransactionManager;
 import org.springframework.transaction.support.TransactionOperations;
+import org.springframework.transaction.support.TransactionTemplate;
 
+import javax.sql.DataSource;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.security.DigestOutputStream;
@@ -33,6 +37,11 @@ public class HashedBlobStorage {
     public HashedBlobStorage(JdbcOperations jdbc, TransactionOperations transaction) {
         this.jdbc = jdbc;
         this.transaction = transaction;
+    }
+
+    public static HashedBlobStorage forDatasource(DataSource ds) {
+        return new HashedBlobStorage(new JdbcTemplate(ds),
+            new TransactionTemplate(new DataSourceTransactionManager(ds)));
     }
 
     public HashedBlob insert(VoidOutputStreamConsumer stream) {
