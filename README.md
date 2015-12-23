@@ -34,7 +34,7 @@ store.store(
 String heading = store.read("my/key.txt",
     (is, metadata) ->
         new BufferedReader(new InputStreamReader(is))
-        .readLine()));
+           .readLine()));
 ```
 
 If the data written already exists in the database, then
