@@ -11,6 +11,7 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.NoSuchElementException;
 import java.util.UUID;
 
 public class BlobStore<EX> {
@@ -83,6 +84,22 @@ public class BlobStore<EX> {
         return storage.transaction.execute(status -> {
             final BlobMetadata<EX> metadata = metadata(key);
             return storage.read(metadata.hash, is -> consumer.accept(is, metadata));
+        });
+    }
+
+    public void delete(String key) {
+        if (1 != storage.jdbc.update("DELETE FROM metadata WHERE key=?", key)) {
+            throw new NoSuchElementException("couldn't delete key " + key + " as it didn't exist");
+        }
+    }
+
+    public void collectGarbage() {
+        storage.transaction.execute(status -> {
+            storage.jdbc.query("SELECT loid FROM blob WHERE NOT EXISTS (" +
+                    "  SELECT NULL FROM metadata WHERE blob.hash=metadata.hash" +
+                    ") FOR UPDATE", (rs, underscore) -> rs.getLong("loid"))
+                    .forEach(storage::delete);
+            return null;
         });
     }
 }

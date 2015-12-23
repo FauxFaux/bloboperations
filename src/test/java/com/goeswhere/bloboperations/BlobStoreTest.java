@@ -4,8 +4,11 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.goeswhere.bloboperations.util.JsonMapper;
 import org.junit.Test;
 
+import java.util.NoSuchElementException;
+import java.util.UUID;
+
 import static junit.framework.Assert.assertEquals;
-import static org.junit.Assert.fail;
+import static org.junit.Assert.*;
 
 public class BlobStoreTest extends DatabaseConnectionHelper {
 
@@ -49,5 +52,38 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
         } catch (IllegalStateException alreadyExists) {
 
         }
+    }
+
+    @Test
+    public void delete() {
+        store.store("baz", os -> null);
+        store.delete("baz");
+    }
+
+    @Test(expected = NoSuchElementException.class)
+    public void deleteMissing() {
+        store.delete("quux");
+    }
+
+    @Test
+    public void collect() {
+        final UUID hashOfQ = UUID.fromString("8e35c2cd-3bf6-641b-db0e-2050b76932cb");
+
+        assertFalse(store.storage.exists(hashOfQ));
+
+        store.store("coll", os -> {
+            os.write('q');
+            return null;
+        });
+
+        assertTrue(store.storage.exists(hashOfQ));
+
+        store.delete("coll");
+
+        assertTrue(store.storage.exists(hashOfQ));
+
+        store.collectGarbage();
+
+        assertFalse(store.storage.exists(hashOfQ));
     }
 }

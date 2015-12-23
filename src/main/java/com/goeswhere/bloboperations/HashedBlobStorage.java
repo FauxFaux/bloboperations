@@ -81,6 +81,27 @@ public class HashedBlobStorage {
         });
     }
 
+    public boolean exists(UUID hash) {
+        return jdbc.queryForObject("SELECT EXISTS (SELECT NULL FROM blob WHERE hash=?)",
+                new Object[] { hash }, Boolean.class);
+    }
+
+    public void delete(long storageOid) {
+        transaction.execute(status -> {
+            // this return value of "1" doesn't seem to be documented, but it seems worth checking
+            if (1 != jdbc.queryForObject("SELECT lo_unlink(?)", new Object[]{storageOid}, Integer.class)) {
+                throw new IllegalStateException("couldn't delete object " + storageOid);
+            }
+
+            final int update = jdbc.update("DELETE FROM blob WHERE loid=?", storageOid);
+            if (1 != update) {
+                throw new IncorrectResultSizeDataAccessException(1, update);
+            }
+
+            return null;
+        });
+    }
+
     private static HashedBlob writeGeneratingMeta(VoidOutputStreamConsumer stream, NewLargeObject largeObject) throws SQLException {
         return largeObject.write(dbOs -> {
             final MessageDigest digest = digest();
