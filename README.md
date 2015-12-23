@@ -51,6 +51,9 @@ Limitations
  * Maximum filenames and metadata: Unlimited.
  * Maximum key length: About 1GB.
  * Maximum metadata storage: About 1GB.
+ * The "key" is opaque and is passed directly to Postgres;
+    it can contain any characters.  There is no normalisation,
+    or special treatment of `/` or `null`.
 
 
 Schema
