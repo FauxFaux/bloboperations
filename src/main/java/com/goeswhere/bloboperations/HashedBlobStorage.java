@@ -1,78 +1,101 @@
 package com.goeswhere.bloboperations;
 
-import com.goeswhere.bloboperations.util.CountingOutputStream;
+import com.goeswhere.bloboperations.util.*;
 import org.postgresql.PGConnection;
 import org.postgresql.largeobject.LargeObject;
 import org.postgresql.largeobject.LargeObjectManager;
+import org.springframework.dao.DuplicateKeyException;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import org.springframework.jdbc.core.JdbcOperations;
 import org.springframework.transaction.support.TransactionOperations;
 
 import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.sql.Connection;
 import java.sql.SQLException;
+import java.util.UUID;
+import java.util.zip.GZIPInputStream;
 import java.util.zip.GZIPOutputStream;
 
 public class HashedBlobStorage {
-    JdbcOperations jdbc;
-    TransactionOperations transaction;
+    private final JdbcOperations jdbc;
+    private final TransactionOperations transaction;
 
-    @FunctionalInterface
-    public interface OutputStreamConsumer {
-        void accept(OutputStream outputStream) throws IOException;
+    public HashedBlobStorage(JdbcOperations jdbc, TransactionOperations transaction) {
+        this.jdbc = jdbc;
+        this.transaction = transaction;
     }
 
-    @FunctionalInterface
-    public interface InputStreamConsumer<T, EX> {
-        T accept(InputStream inputStream, BlobMetadata<EX> metadata) throws IOException;
-    }
-
-    HashedBlob insert(OutputStreamConsumer stream) {
-        return transaction.execute(status -> jdbc.execute((Connection conn) -> {
-                    final MessageDigest digest = digest();
-
-                    final LargeObjectManager pgLOManager = api(conn);
-                    final long newOid = pgLOManager.createLO(LargeObjectManager.WRITE);
-                    LargeObject objectInDb = null;
-
-                    boolean success = false;
+    HashedBlob insert(VoidOutputStreamConsumer stream) {
+        return transaction.execute(status -> {
+            final HashedBlob stored = jdbc.execute((Connection conn) -> {
+                try (final NewLargeObject largeObject = new NewLargeObject(api(conn))) {
                     try {
-                        objectInDb = pgLOManager.open(newOid, LargeObjectManager.WRITE);
-                        // nested output streams are applied in reading order; we take the callers values,
-                        // we count them, then we digest them, then we gzip them...
-                        // then the countingToDb counts them, then they go to the db.
-                        try (final CountingOutputStream countingToDb = new CountingOutputStream(objectInDb.getOutputStream());
-                             final CountingOutputStream countingFromCaller = new CountingOutputStream(
-                                     new DigestOutputStream(new GZIPOutputStream(countingToDb), digest))) {
-
-                            stream.accept(countingFromCaller);
-
-                            // not convinced this is necessary, but seems like it may protect against some problems
-                            countingFromCaller.flush();
-
-                            success = true;
-                            return new HashedBlob(new Hash(digest.digest()), countingToDb.getCount(), countingFromCaller.getCount());
-                        } catch (IOException e) {
-                            throw new IllegalStateException("couldn't construct blob", e);
-                        }
-                    } finally {
-                        // if we opened an object, it must be closed;
-                        // on success, this will flush; on both, it will free any driver resources
-                        if (null != objectInDb) {
-                            objectInDb.close();
-                        }
-
-                        // if we didn't complete our write, then ensure the oid is cleaned up
-                        if (!success) {
-                            pgLOManager.delete(newOid);
-                        }
+                        return writeGeneratingMeta(stream, largeObject);
+                    } catch (Throwable t) {
+                        t.printStackTrace();
+                        throw t;
                     }
                 }
-        ));
+            });
+
+            try {
+                jdbc.update("INSERT INTO blob (hash, stored_length, original_length, loid) VALUES (?, ?, ?, ?)",
+                        stored.uuid, stored.storedLength, stored.originalLength, stored.oid);
+            } catch (DuplicateKeyException ignored) {
+                // Our transaction has errored, so is going to rollback.
+                // Not going to bother to refresh the returned object; the values may be wrong
+                // (the loid certainly is), but they're not really part of our exposed api.
+            }
+
+            return stored;
+        });
+    }
+
+    <T> T read(UUID uuid, InputStreamConsumer<T> consumer) throws IncorrectResultSizeDataAccessException {
+        return transaction.execute(status -> {
+            final long oid = jdbc.queryForObject("SELECT loid FROM blob WHERE hash=?", new Object[]{uuid}, Long.class);
+            return jdbc.execute((Connection conn) -> {
+                final LargeObjectManager pgLOManager = api(conn);
+                final LargeObject object = pgLOManager.open(oid, LargeObjectManager.READ);
+                try (final GZIPInputStream inputStream = new GZIPInputStream(object.getInputStream())) {
+                    return consumer.accept(inputStream);
+                } catch (IOException e) {
+                    throw new IllegalStateException(e);
+                } finally {
+                    object.close();
+                }
+            });
+        });
+    }
+
+    private static HashedBlob writeGeneratingMeta(VoidOutputStreamConsumer stream, NewLargeObject largeObject) throws SQLException {
+        return largeObject.write(dbOs -> {
+            final MessageDigest digest = digest();
+            // nested output streams are applied in reading order; we take the callers values,
+            // we count them, then we digest them, then we gzip them...
+            // then the countingToDb counts them, then they go to the db.
+
+            // dbOs doesn't like being closed, so we'll just flush it and close it outside
+            final CountingOutputStream countingToDb = new CountingOutputStream(dbOs);
+            try (final CountingOutputStream countingFromCaller = new CountingOutputStream(
+                    new DigestOutputStream(new GZIPOutputStream(countingToDb), digest))) {
+
+                stream.accept(countingFromCaller);
+                countingToDb.flush();
+
+                return new HashedBlob(
+                        Hash.uuid(digest.digest()),
+                        countingToDb.getCount(),
+                        countingFromCaller.getCount(),
+                        largeObject.getOid());
+
+            } catch (IOException e) {
+                throw new IllegalStateException("couldn't construct blob", e);
+            }
+        });
     }
 
     private static MessageDigest digest() {
@@ -83,7 +106,7 @@ public class HashedBlobStorage {
         }
     }
 
-    private LargeObjectManager api(Connection conn) throws SQLException {
+    private static LargeObjectManager api(Connection conn) throws SQLException {
         return conn.unwrap(PGConnection.class).getLargeObjectAPI();
     }
 }
