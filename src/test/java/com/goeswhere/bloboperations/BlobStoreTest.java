@@ -25,10 +25,11 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
     }
 
     BlobStore<Foo> store = new BlobStore<>(
-            new HashedBlobStorage(jdbc, transactions),
+            new HashedBlobStorage(jdbc, transactions, "blopstest.blob"),
             new JsonMapper().jsonStringer(
             new TypeReference<Foo>() {
-            }));
+            }),
+            "blopstest.metadata");
 
     @Test
     public void testEmpty() {

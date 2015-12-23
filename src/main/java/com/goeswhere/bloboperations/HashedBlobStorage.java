@@ -31,17 +31,29 @@ import java.util.zip.GZIPOutputStream;
 public class HashedBlobStorage {
     private static final Log logger = LogFactory.getLog(HashedBlobStorage.class);
 
+    public static final String DEFAULT_TABLE_NAME = "blob";
+
     final JdbcOperations jdbc;
     final TransactionOperations transaction;
+    final String blobTableName;
 
-    public HashedBlobStorage(JdbcOperations jdbc, TransactionOperations transaction) {
+    public HashedBlobStorage(
+            JdbcOperations jdbc,
+            TransactionOperations transaction,
+            String blobTableName) {
         this.jdbc = jdbc;
         this.transaction = transaction;
+        this.blobTableName = blobTableName;
     }
 
     public static HashedBlobStorage forDatasource(DataSource ds) {
+        return forDatasource(ds, DEFAULT_TABLE_NAME);
+    }
+
+    public static HashedBlobStorage forDatasource(DataSource ds, String tableName) {
         return new HashedBlobStorage(new JdbcTemplate(ds),
-            new TransactionTemplate(new DataSourceTransactionManager(ds)));
+                new TransactionTemplate(new DataSourceTransactionManager(ds)),
+                tableName);
     }
 
     public HashedBlob insert(VoidOutputStreamConsumer stream) {
@@ -55,11 +67,13 @@ public class HashedBlobStorage {
             // eliminate the race condition on the following "where not exists" clause by...
             // locking the whole table for write.  Not ideal, but we're expecting the transaction to
             // terminate quickly after this point, and it's better than random, hard to reproduce errors
-            jdbc.execute("LOCK TABLE blob IN SHARE ROW EXCLUSIVE MODE");
+            jdbc.execute("LOCK TABLE " + blobTableName + " IN SHARE ROW EXCLUSIVE MODE");
 
-            final int updated = jdbc.update("INSERT INTO blob (hash, stored_length, original_length, loid)" +
-                            "SELECT ?, ?, ?, ? WHERE NOT EXISTS (" +
-                            "  SELECT NULL FROM blob WHERE hash=?" +
+            final int updated = jdbc.update(
+                    "INSERT INTO " + blobTableName + " " +
+                            "(hash, stored_length, original_length, loid)" +
+                            "  SELECT ?, ?, ?, ? WHERE NOT EXISTS (" +
+                            "    SELECT NULL FROM " + blobTableName + " WHERE hash=?" +
                             ")",
                     stored.uuid, stored.storedLength, stored.originalLength, stored.oid, stored.uuid);
 
@@ -73,7 +87,9 @@ public class HashedBlobStorage {
 
     public <T> T read(UUID uuid, InputStreamConsumer<T> consumer) throws IncorrectResultSizeDataAccessException {
         return transaction.execute(status -> {
-            final long oid = jdbc.queryForObject("SELECT loid FROM blob WHERE hash=?", new Object[]{uuid}, Long.class);
+            final long oid = jdbc.queryForObject(
+                    "SELECT loid FROM " + blobTableName + " WHERE hash=?",
+                    new Object[]{uuid}, Long.class);
             return jdbc.execute((Connection conn) -> {
                 final LargeObjectManager pgLOManager = api(conn);
                 final LargeObject object = pgLOManager.open(oid, LargeObjectManager.READ);
@@ -89,8 +105,8 @@ public class HashedBlobStorage {
     }
 
     public boolean exists(UUID hash) {
-        return jdbc.queryForObject("SELECT EXISTS (SELECT NULL FROM blob WHERE hash=?)",
-                new Object[] { hash }, Boolean.class);
+        return jdbc.queryForObject("SELECT EXISTS (SELECT NULL FROM " + blobTableName + " WHERE hash=?)",
+                new Object[]{hash}, Boolean.class);
     }
 
     public void delete(long storageOid) {
@@ -100,7 +116,7 @@ public class HashedBlobStorage {
                 throw new IllegalStateException("couldn't delete object " + storageOid);
             }
 
-            final int update = jdbc.update("DELETE FROM blob WHERE loid=?", storageOid);
+            final int update = jdbc.update("DELETE FROM " + blobTableName + " WHERE loid=?", storageOid);
             if (1 != update) {
                 throw new IncorrectResultSizeDataAccessException(1, update);
             }

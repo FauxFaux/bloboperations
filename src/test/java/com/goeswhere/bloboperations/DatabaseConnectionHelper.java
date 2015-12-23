@@ -15,11 +15,11 @@ public class DatabaseConnectionHelper {
 
     @BeforeClass
     public static void connect() {
-        ds = new DriverManagerDataSource("jdbc:postgresql:test");
+        ds = new DriverManagerDataSource("jdbc:postgresql:test", "test", "test");
         jdbc = new JdbcTemplate(ds);
         transactions = new TransactionTemplate(new DataSourceTransactionManager(ds));
-        jdbc.execute("TRUNCATE TABLE blob");
-        jdbc.execute("TRUNCATE TABLE metadata");
+        jdbc.execute("TRUNCATE TABLE blopstest.blob");
+        jdbc.execute("TRUNCATE TABLE blopstest.metadata");
     }
 
 }
