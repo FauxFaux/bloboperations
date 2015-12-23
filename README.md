@@ -12,10 +12,10 @@ BlobOperations additionally adds compression and de-duplication,
  making it quicker and cheaper to store lots of data.
 
 There are two APIs, a high-level "filesystem-like" API, and
- the underlying hashed storage mechanism.
-
-The filesystem-like API provides names, and lets you store
- other additional metadata alongside your files:
+ the underlying hashed storage mechanism.  The filesystem-like
+ API provides names, and lets you store other additional
+ metadata alongside your files (metadata is disabled by default,
+ see section below):
 
 ```java
 File myData = new File(some, path);
@@ -77,6 +77,10 @@ Metadata Storage
 The schema and filesystem abstraction code has space for
  carrying around a single VARCHAR of "extra" metadata,
  and machinery for serialising and deserialising it.
+
+By default, the configured serialiser is the "Null Serialiser",
+ it will serialise everything to `null`.  You must provide
+ a serialiser if you want to use one.
 
 An example serialiser is provided in `JsonMapper.java`,
  which is not on the main classpath to avoid a `Jackson`
