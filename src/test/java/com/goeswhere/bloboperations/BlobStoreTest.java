@@ -1,7 +1,7 @@
 package com.goeswhere.bloboperations;
 
 import com.fasterxml.jackson.core.type.TypeReference;
-import com.goeswhere.bloboperations.util.JsonMapper;
+import com.goeswhere.bloboperations.helpers.JsonMapper;
 import org.junit.Test;
 
 import java.util.NoSuchElementException;
@@ -26,9 +26,9 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
 
     BlobStore<Foo> store = new BlobStore<>(
             new HashedBlobStorage(jdbc, transactions),
-            new JsonMapper(),
+            new JsonMapper().jsonStringer(
             new TypeReference<Foo>() {
-            });
+            }));
 
     @Test
     public void testEmpty() {

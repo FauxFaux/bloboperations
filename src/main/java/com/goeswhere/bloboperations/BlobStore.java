@@ -1,8 +1,7 @@
 package com.goeswhere.bloboperations;
 
-import com.fasterxml.jackson.core.type.TypeReference;
-import com.goeswhere.bloboperations.util.JsonMapper;
 import com.goeswhere.bloboperations.util.OutputStreamConsumer;
+import com.goeswhere.bloboperations.util.Stringer;
 import com.goeswhere.bloboperations.util.VoidOutputStreamConsumer;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
@@ -16,13 +15,11 @@ import java.util.UUID;
 
 public class BlobStore<EX> {
     final HashedBlobStorage storage;
-    final JsonMapper mapper;
-    final TypeReference<EX> typeReference;
+    private final Stringer<EX> serialiseExtra;
 
-    public BlobStore(HashedBlobStorage storage, JsonMapper mapper, TypeReference<EX> typeReference) {
+    public BlobStore(HashedBlobStorage storage, Stringer<EX> serialiseExtra) {
         this.storage = storage;
-        this.mapper = mapper;
-        this.typeReference = typeReference;
+        this.serialiseExtra = serialiseExtra;
     }
 
     public EX store(String key, OutputStreamConsumer<EX> data) {
@@ -56,7 +53,7 @@ public class BlobStore<EX> {
 
             final int updated = storage.jdbc.update(
                     "UPDATE metadata SET hash=?, extra=? WHERE key=?",
-                    hashed.uuid, mapper.toJson(cap.ex), key);
+                    hashed.uuid, serialiseExtra.toString.apply(cap.ex), key);
 
             if (1 != updated) {
                 throw new IncorrectResultSizeDataAccessException(1, updated);
@@ -76,7 +73,7 @@ public class BlobStore<EX> {
                             key,
                             ZonedDateTime.ofInstant(rs.getTimestamp("created").toInstant(), ZoneOffset.UTC),
                             (UUID) rs.getObject("hash"),
-                            mapper.fromJson(rs.getString("extra"), typeReference));
+                            serialiseExtra.fromString.apply(rs.getString("extra")));
                 });
     }
 
