@@ -59,6 +59,26 @@ Limitations
  * No local storage or significant memory is used (i.e. the file
     is not buffered locally, nor written to a temporary file).
 
+Why not the ..filesystem?
+--------------------------
+
+The database has many advantages over the filesystem:
+
+ * Fewer arbitrary restrictions, e.g. file name lengths and
+   characters, filesystem problems (too many files in a directory).
+ * Transactional safety for creation and deletion.
+ * It's one less thing to provision and manage, e.g.
+ * Automatically picked up by existing backups.
+ * Accessible remotely and securely.
+ * As resilient as Postgres; e.g. replication to slaves
+ * Postgres enforces credentials on access to objects
+ * Some chance to deal with disc issues, e.g. check-summing, WAL
+
+Plus, this library is likely to be less code than the equivalent
+ library for the filesystem, and more likely to be correct (as
+ Postgres eventually enforces all constraints).  Lock-files,
+ temporary files, fragmenting path names to avoid directory limits,
+ ...
 
 Schema
 ------
