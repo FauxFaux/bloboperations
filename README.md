@@ -207,7 +207,7 @@ Testing
 -------
 
 The tests assume existence of a `test` user/database
- on the local machine, wich a password of "`test`".
+ on the local machine, with a password of "`test`".
  
     sudo -u postgres createuser test
     sudo -u postgres createdb -O test test
