@@ -11,8 +11,11 @@ import org.springframework.dao.IncorrectResultSizeDataAccessException;
 import javax.sql.DataSource;
 import java.io.IOException;
 import java.io.OutputStream;
+import java.sql.ResultSet;
+import java.sql.SQLException;
 import java.time.ZoneOffset;
 import java.time.ZonedDateTime;
+import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -86,18 +89,41 @@ public class BlobStore<EX> {
         });
     }
 
+    private BlobMetadata<EX> blobMetadataFromResultSet(String key, ResultSet rs) throws SQLException {
+        return new BlobMetadata<>(
+                key,
+                ZonedDateTime.ofInstant(rs.getTimestamp("created").toInstant(), ZoneOffset.UTC),
+                hashColumn(rs),
+                serialiseExtra.fromString.apply(rs.getString("extra")));
+    }
+
+    private UUID hashColumn(ResultSet rs) throws SQLException {
+        return (UUID) rs.getObject("hash");
+    }
+
     public BlobMetadata<EX> metadata(String key) {
         // FOR SHARE prevents the row from being deleted, which will prevent
         // (at an application level) the blob from being deleted before we read it
         return storage.jdbc.queryForObject(
                 "SELECT created, hash, extra FROM " + metadataTableName + " WHERE key=? FOR SHARE",
-                new Object[]{key}, (rs, underscore) -> {
-                    return new BlobMetadata<>(
-                            key,
-                            ZonedDateTime.ofInstant(rs.getTimestamp("created").toInstant(), ZoneOffset.UTC),
-                            (UUID) rs.getObject("hash"),
-                            serialiseExtra.fromString.apply(rs.getString("extra")));
-                });
+                new Object[]{key}, (rs, underscore) -> blobMetadataFromResultSet(key, rs));
+    }
+
+    public List<FullMetadata<EX>> listFullMetadataByPrefix(String prefix) {
+        return storage.jdbc.query(
+                "SELECT key, created, " + metadataTableName + ".hash, extra, original_length, stored_length, loid" +
+                        " FROM " + metadataTableName + " INNER JOIN " + storage.blobTableName +
+                        " USING (hash)" +
+                        " WHERE key LIKE ? FOR SHARE",
+                new Object[]{prefix + "%"}, (rs, underscore) -> new FullMetadata<>(
+                        blobMetadataFromResultSet(rs.getString("key"), rs),
+                        new HashedBlob(
+                                hashColumn(rs),
+                                rs.getLong("stored_length"),
+                                rs.getLong("original_length"),
+                                rs.getLong("loid"))
+                )
+        );
     }
 
     public void updateUserMetadata(String key, EX newMetadata) {

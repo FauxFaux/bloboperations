@@ -6,8 +6,8 @@ import org.junit.Test;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
 import java.nio.charset.StandardCharsets;
-import java.util.NoSuchElementException;
-import java.util.UUID;
+import java.util.*;
+import java.util.stream.Collectors;
 
 import static junit.framework.Assert.assertEquals;
 import static org.junit.Assert.*;
@@ -116,6 +116,22 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
         assertFalse(store.exists("pre/a"));
         assertFalse(store.exists("pre/b"));
         assertTrue(store.exists("preb"));
+    }
+
+    @Test
+    public void fullMetadata() {
+        writeHelloWorld("full/a");
+        writeHelloWorld("full/b");
+        store.store("full/c", os -> new Foo(5));
+
+        final List<FullMetadata<Foo>> datas = store.listFullMetadataByPrefix("full/");
+        assertEquals(3, datas.size());
+
+        assertEquals(new HashSet<>(Arrays.asList("full/a", "full/b", "full/c")),
+                datas.stream().map(meta -> meta.metadata.key).collect(Collectors.toSet()));
+
+        assertEquals(new HashSet<>(Arrays.asList(0L, (long)"hello world".length())),
+                datas.stream().map(meta -> meta.backingStore.originalLength).collect(Collectors.toSet()));
     }
 
     @Test
