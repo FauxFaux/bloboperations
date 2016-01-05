@@ -131,6 +131,12 @@ public class BlobStore<EX> {
         return null != sum ? sum : 0;
     }
 
+    public boolean exists(String key) {
+        return storage.jdbc.queryForObject("SELECT EXISTS (SELECT NULL   FROM " + metadataTableName + " WHERE key=?)",
+                new Object[] { key },
+                Boolean.class);
+    }
+
     public void collectGarbage() {
         storage.transaction.execute(status -> {
             storage.jdbc.query("SELECT loid FROM " + storage.blobTableName + " WHERE NOT EXISTS (" +

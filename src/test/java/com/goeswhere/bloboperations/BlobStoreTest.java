@@ -99,6 +99,15 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
     }
 
     @Test
+    public void blobExists() {
+        assertFalse(store.exists("existy"));
+        writeHelloWorld("existy");
+        assertTrue(store.exists("existy"));
+        store.delete("existy");
+        assertFalse(store.exists("existy"));
+    }
+
+    @Test
     public void collect() {
         final UUID hashOfQ = UUID.fromString("8e35c2cd-3bf6-641b-db0e-2050b76932cb");
 
