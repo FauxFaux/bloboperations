@@ -3,6 +3,7 @@ package com.goeswhere.bloboperations;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.goeswhere.bloboperations.helpers.JsonMapper;
 import org.junit.Test;
+import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
 import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
@@ -77,6 +78,19 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
             os.write("hello world".getBytes(StandardCharsets.UTF_8));
             return null;
         });
+    }
+
+    @Test(expected = IncorrectResultSizeDataAccessException.class)
+    public void updateMissingMetadata() {
+        store.updateUserMetadata("johnson", new Foo());
+    }
+
+    @Test
+    public void updateMetadata() {
+        writeHelloWorld("meaty");
+        assertNull(store.metadata("meaty").extra);
+        store.updateUserMetadata("meaty", new Foo(12));
+        assertEquals(12, store.metadata("meaty").extra.bar);
     }
 
     @Test(expected = NoSuchElementException.class)

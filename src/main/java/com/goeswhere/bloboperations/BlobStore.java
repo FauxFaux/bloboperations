@@ -100,6 +100,15 @@ public class BlobStore<EX> {
                 });
     }
 
+    public void updateUserMetadata(String key, EX newMetadata) {
+        final int updated = storage.jdbc.update("UPDATE " + metadataTableName + " SET extra=? WHERE key=?",
+                serialiseExtra.toString.apply(newMetadata),
+                key);
+        if (1 != updated) {
+            throw new IncorrectResultSizeDataAccessException(1, updated);
+        }
+    }
+
     public <T> T read(String key, InputStreamAndMetadataConsumer<T, EX> consumer) {
         return storage.transaction.execute(status -> {
             final BlobMetadata<EX> metadata = metadata(key);
