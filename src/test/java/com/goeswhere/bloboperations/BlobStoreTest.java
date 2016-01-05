@@ -120,6 +120,14 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
 
     @Test
     public void fullMetadata() {
+        writeHelloWorld("full-data");
+        final FullMetadata<Foo> full = store.fullMetadata("full-data");
+        assertEquals("full-data", full.metadata.key);
+        assertEquals("hello world".length(), full.backingStore.originalLength);
+    }
+
+    @Test
+    public void fullMetadataList() {
         writeHelloWorld("full/a");
         writeHelloWorld("full/b");
         store.store("full/c", os -> new Foo(5));

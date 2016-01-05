@@ -7,6 +7,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.springframework.dao.DuplicateKeyException;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
+import org.springframework.jdbc.core.RowMapper;
 
 import javax.sql.DataSource;
 import java.io.IOException;
@@ -28,6 +29,7 @@ public class BlobStore<EX> {
     private final Stringer<EX> serialiseExtra;
 
     private final String metadataTableName;
+    private final String selectFullMetadata;
 
     public BlobStore(
             HashedBlobStorage storage,
@@ -42,6 +44,9 @@ public class BlobStore<EX> {
         this.storage = storage;
         this.serialiseExtra = serialiseExtra;
         this.metadataTableName = metadataTableName;
+        selectFullMetadata = "SELECT key, created, " + metadataTableName + ".hash, extra, original_length, stored_length, loid" +
+                " FROM " + metadataTableName + " INNER JOIN " + storage.blobTableName +
+                " USING (hash) ";
     }
 
     public static <T> BlobStore<T> forDatasource(DataSource ds) {
@@ -109,20 +114,28 @@ public class BlobStore<EX> {
                 new Object[]{key}, (rs, underscore) -> blobMetadataFromResultSet(key, rs));
     }
 
+    public FullMetadata<EX> fullMetadata(String key) {
+        return storage.jdbc.queryForObject(
+                selectFullMetadata + " WHERE key=? FOR SHARE",
+                new Object[]{key}, fullMetadataMapper()
+        );
+    }
+
     public List<FullMetadata<EX>> listFullMetadataByPrefix(String prefix) {
         return storage.jdbc.query(
-                "SELECT key, created, " + metadataTableName + ".hash, extra, original_length, stored_length, loid" +
-                        " FROM " + metadataTableName + " INNER JOIN " + storage.blobTableName +
-                        " USING (hash)" +
-                        " WHERE key LIKE ? FOR SHARE",
-                new Object[]{prefix + "%"}, (rs, underscore) -> new FullMetadata<>(
-                        blobMetadataFromResultSet(rs.getString("key"), rs),
-                        new HashedBlob(
-                                hashColumn(rs),
-                                rs.getLong("stored_length"),
-                                rs.getLong("original_length"),
-                                rs.getLong("loid"))
-                )
+                selectFullMetadata + " WHERE key LIKE ? FOR SHARE",
+                new Object[]{prefix + "%"}, fullMetadataMapper()
+        );
+    }
+
+    private RowMapper<FullMetadata<EX>> fullMetadataMapper() {
+        return (rs, underscore) -> new FullMetadata<>(
+                blobMetadataFromResultSet(rs.getString("key"), rs),
+                new HashedBlob(
+                        hashColumn(rs),
+                        rs.getLong("stored_length"),
+                        rs.getLong("original_length"),
+                        rs.getLong("loid"))
         );
     }
 
