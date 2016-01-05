@@ -108,6 +108,17 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
     }
 
     @Test
+    public void deletePrefix() {
+        writeHelloWorld("pre/a");
+        writeHelloWorld("pre/b");
+        writeHelloWorld("preb");
+        store.deletePrefix("pre/");
+        assertFalse(store.exists("pre/a"));
+        assertFalse(store.exists("pre/b"));
+        assertTrue(store.exists("preb"));
+    }
+
+    @Test
     public void collect() {
         final UUID hashOfQ = UUID.fromString("8e35c2cd-3bf6-641b-db0e-2050b76932cb");
 

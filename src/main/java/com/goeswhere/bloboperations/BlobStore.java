@@ -122,6 +122,10 @@ public class BlobStore<EX> {
         }
     }
 
+    public void deletePrefix(String prefix) {
+        storage.jdbc.update("DELETE FROM " + metadataTableName + " WHERE key LIKE ?", prefix + "%");
+    }
+
     public long directoryApparentSize(String directory) {
         final Long sum = storage.jdbc.queryForObject("SELECT SUM(stored_length)" +
                 " FROM " + storage.blobTableName +
