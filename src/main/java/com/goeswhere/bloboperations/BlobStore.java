@@ -113,6 +113,15 @@ public class BlobStore<EX> {
         }
     }
 
+    public long directoryApparentSize(String directory) {
+        final Long sum = storage.jdbc.queryForObject("SELECT SUM(stored_length)" +
+                " FROM " + storage.blobTableName +
+                " INNER JOIN " + metadataTableName + "" +
+                " USING (hash)" +
+                " WHERE key LIKE ?", new Object[]{directory + "%"}, Long.class);
+        return null != sum ? sum : 0;
+    }
+
     public void collectGarbage() {
         storage.transaction.execute(status -> {
             storage.jdbc.query("SELECT loid FROM " + storage.blobTableName + " WHERE NOT EXISTS (" +

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.core.type.TypeReference;
 import com.goeswhere.bloboperations.helpers.JsonMapper;
 import org.junit.Test;
 
-import java.nio.file.Files;
+import java.nio.charset.StandardCharsets;
 import java.util.NoSuchElementException;
 import java.util.UUID;
 
@@ -60,6 +60,23 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
     public void delete() {
         store.store("baz", os -> null);
         store.delete("baz");
+    }
+
+    @Test
+    public void apparentSizes() {
+        assertEquals(0, store.directoryApparentSize("a/"));
+        writeHelloWorld("a/foo");
+        final long justOne = store.directoryApparentSize("a/");
+        assertNotSame(0, justOne);
+        writeHelloWorld("a/bar");
+        assertNotSame(justOne, store.directoryApparentSize("a/"));
+    }
+
+    private void writeHelloWorld(String key) {
+        store.store(key, os -> {
+            os.write("hello world".getBytes(StandardCharsets.UTF_8));
+            return null;
+        });
     }
 
     @Test(expected = NoSuchElementException.class)
