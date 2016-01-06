@@ -20,14 +20,11 @@ public class NewLargeObject implements AutoCloseable {
     }
 
     public <T> T write(OutputStreamConsumer<T> consumer) throws SQLException {
-        T ret;
-        final OutputStream outputStream = objectInDb.getOutputStream();
-        try {
-            ret = consumer.accept(outputStream);
+        try (final OutputStream outputStream = objectInDb.getOutputStream()) {
+            return consumer.accept(outputStream);
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
-        return ret;
     }
 
     public long getOid() {
