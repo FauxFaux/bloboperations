@@ -4,7 +4,7 @@
 
     <groupId>com.goeswhere</groupId>
     <artifactId>bloboperations</artifactId>
-    <version>0.0-SNAPSHOT</version>
+    <version>0.2</version>
     <build>
         <plugins>
             <plugin>
