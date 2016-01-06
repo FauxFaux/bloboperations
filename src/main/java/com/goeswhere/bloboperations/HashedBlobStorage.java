@@ -1,9 +1,6 @@
 package com.goeswhere.bloboperations;
 
-import com.goeswhere.bloboperations.util.CountingOutputStream;
-import com.goeswhere.bloboperations.util.InputStreamConsumer;
-import com.goeswhere.bloboperations.util.NewLargeObject;
-import com.goeswhere.bloboperations.util.VoidOutputStreamConsumer;
+import com.goeswhere.bloboperations.util.*;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.postgresql.PGConnection;
@@ -138,12 +135,12 @@ public class HashedBlobStorage {
             // then the countingToDb counts them, then they go to the db.
 
             // dbOs doesn't like being closed, so we'll just flush it and close it outside
-            final CountingOutputStream countingToDb = new CountingOutputStream(dbOs);
-            try (final CountingOutputStream countingFromCaller = new CountingOutputStream(
+            try (final CountingOutputStream countingToDb = new CountingOutputStream(new BlockCloseOutputStream(dbOs));
+                 final CountingOutputStream countingFromCaller = new CountingOutputStream(
                     new DigestOutputStream(new GZIPOutputStream(countingToDb), digest))) {
 
                 stream.accept(countingFromCaller);
-                countingToDb.flush();
+                countingFromCaller.flush();
 
                 return new HashedBlob(
                         uuid(digest.digest()),

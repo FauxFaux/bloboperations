@@ -5,6 +5,8 @@ import com.goeswhere.bloboperations.helpers.JsonMapper;
 import org.junit.Test;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
+import java.io.BufferedOutputStream;
+import java.io.OutputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.*;
 import java.util.stream.Collectors;
@@ -140,6 +142,17 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
 
         assertEquals(new HashSet<>(Arrays.asList(0L, (long)"hello world".length())),
                 datas.stream().map(meta -> meta.backingStore.originalLength).collect(Collectors.toSet()));
+    }
+
+    @Test
+    public void userCloses() {
+        store.store("close", os -> {
+            try (OutputStream buff = new BufferedOutputStream(os)) {
+                buff.write("you think you're".getBytes(StandardCharsets.UTF_8));
+            }
+
+            return null;
+        });
     }
 
     @Test
