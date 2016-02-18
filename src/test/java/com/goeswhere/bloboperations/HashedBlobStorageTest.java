@@ -17,7 +17,7 @@ public class HashedBlobStorageTest extends DatabaseConnectionHelper {
     final HashedBlobStorage storage = new HashedBlobStorage(
             jdbc,
             transactions,
-            "blopstest.blob");
+            "blopstest.blob", HashedBlobStorage.GZIP_STORAGE_FILTER);
 
     @Test
     public void testInsertEmpty() {

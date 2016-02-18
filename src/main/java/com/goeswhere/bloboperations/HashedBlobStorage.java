@@ -15,6 +15,8 @@ import org.springframework.transaction.support.TransactionTemplate;
 
 import javax.sql.DataSource;
 import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStream;
 import java.nio.ByteBuffer;
 import java.security.DigestOutputStream;
 import java.security.MessageDigest;
@@ -30,17 +32,32 @@ public class HashedBlobStorage {
 
     public static final String DEFAULT_TABLE_NAME = "blob";
 
+    public static final StorageFilter GZIP_STORAGE_FILTER = new StorageFilter() {
+        @Override
+        public OutputStream output(OutputStream out) throws IOException {
+            return new GZIPOutputStream(out);
+        }
+
+        @Override
+        public InputStream input(InputStream in) throws IOException {
+            return new GZIPInputStream(in);
+        }
+    };
+
     final JdbcOperations jdbc;
     final TransactionOperations transaction;
     final String blobTableName;
+    final StorageFilter storageFilter;
 
     public HashedBlobStorage(
             JdbcOperations jdbc,
             TransactionOperations transaction,
-            String blobTableName) {
+            String blobTableName,
+            StorageFilter storageFilter) {
         this.jdbc = jdbc;
         this.transaction = transaction;
         this.blobTableName = blobTableName;
+        this.storageFilter = storageFilter;
     }
 
     public static HashedBlobStorage forDatasource(DataSource ds) {
@@ -50,7 +67,18 @@ public class HashedBlobStorage {
     public static HashedBlobStorage forDatasource(DataSource ds, String tableName) {
         return new HashedBlobStorage(new JdbcTemplate(ds),
                 new TransactionTemplate(new DataSourceTransactionManager(ds)),
-                tableName);
+                tableName,
+                GZIP_STORAGE_FILTER);
+    }
+
+    public interface StorageFilter {
+        default OutputStream output(OutputStream out) throws IOException {
+            return out;
+        }
+
+        default InputStream input(InputStream in) throws IOException {
+            return in;
+        }
     }
 
     public HashedBlob insert(VoidOutputStreamConsumer stream) {
@@ -91,7 +119,7 @@ public class HashedBlobStorage {
             return jdbc.execute((Connection conn) -> {
                 final LargeObjectManager pgLOManager = api(conn);
                 final LargeObject object = pgLOManager.open(oid, LargeObjectManager.READ);
-                try (final GZIPInputStream inputStream = new GZIPInputStream(object.getInputStream())) {
+                try (final InputStream inputStream = storageFilter.input(object.getInputStream())) {
                     return consumer.accept(inputStream);
                 } catch (IOException e) {
                     throw new IllegalStateException("callee's code threw while trying to read", e);
@@ -127,7 +155,7 @@ public class HashedBlobStorage {
         }
     }
 
-    private static HashedBlob writeGeneratingMeta(VoidOutputStreamConsumer stream, NewLargeObject largeObject) throws SQLException {
+    private HashedBlob writeGeneratingMeta(VoidOutputStreamConsumer stream, NewLargeObject largeObject) throws SQLException {
         return largeObject.write(dbOs -> {
             final MessageDigest digest = digest();
             // nested output streams are applied in reading order; we take the callers values,
@@ -137,7 +165,7 @@ public class HashedBlobStorage {
             // dbOs doesn't like being closed, so we'll just flush it and close it outside
             try (final CountingOutputStream countingToDb = new CountingOutputStream(new BlockCloseOutputStream(dbOs));
                  final CountingOutputStream countingFromCaller = new CountingOutputStream(
-                    new DigestOutputStream(new GZIPOutputStream(countingToDb), digest))) {
+                    new DigestOutputStream(storageFilter.output(countingToDb), digest))) {
 
                 stream.accept(countingFromCaller);
                 countingFromCaller.flush();

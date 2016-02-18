@@ -29,10 +29,10 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
     }
 
     BlobStore<Foo> store = new BlobStore<>(
-            new HashedBlobStorage(jdbc, transactions, "blopstest.blob"),
+            new HashedBlobStorage(jdbc, transactions, "blopstest.blob", HashedBlobStorage.GZIP_STORAGE_FILTER),
             new JsonMapper().jsonStringer(
-            new TypeReference<Foo>() {
-            }),
+                    new TypeReference<Foo>() {
+                    }),
             "blopstest.metadata");
 
     @Test
@@ -140,7 +140,7 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
         assertEquals(new HashSet<>(Arrays.asList("full/a", "full/b", "full/c")),
                 datas.stream().map(meta -> meta.metadata.key).collect(Collectors.toSet()));
 
-        assertEquals(new HashSet<>(Arrays.asList(0L, (long)"hello world".length())),
+        assertEquals(new HashSet<>(Arrays.asList(0L, (long) "hello world".length())),
                 datas.stream().map(meta -> meta.backingStore.originalLength).collect(Collectors.toSet()));
     }
 
