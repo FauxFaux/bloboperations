@@ -213,3 +213,12 @@ The tests assume existence of a `test` user/database
     sudo -u postgres createdb -O test test
  
  See `DatabaseConnectionHelper.java`.
+
+
+License
+-------
+
+BlobOperations is licensed under the Apache 2.0 license.
+
+This allows you to use the code for any purpose, including copy-pasting
+ parts of it into your proprietary software.
