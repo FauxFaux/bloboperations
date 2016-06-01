@@ -169,6 +169,7 @@ public class HashedBlobStorage {
 
                 stream.accept(countingFromCaller);
                 countingFromCaller.flush();
+                countingToDb.flush();
 
                 return new HashedBlob(
                         uuid(digest.digest()),
