@@ -2,12 +2,14 @@ package com.goeswhere.bloboperations;
 
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.goeswhere.bloboperations.helpers.JsonMapper;
+import com.google.common.io.ByteStreams;
+import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.dao.IncorrectResultSizeDataAccessException;
 
-import java.io.BufferedOutputStream;
-import java.io.OutputStream;
+import java.io.*;
 import java.nio.charset.StandardCharsets;
+import java.nio.file.Files;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -175,5 +177,34 @@ public class BlobStoreTest extends DatabaseConnectionHelper {
         store.collectGarbage();
 
         assertFalse(store.storage.exists(hashOfQ));
+    }
+
+    @Test
+    public void testTruncatedStored() throws IOException {
+        final File tmp = File.createTempFile("random-data", ".tmp");
+        final int realLength = 10_000_000;
+
+        try {
+            tmp.deleteOnExit();
+            final byte[] bytes = new byte[realLength];
+            for (int i = 0; i < bytes.length; i++) {
+                bytes[i] = (byte) i;
+            }
+            Files.write(tmp.toPath(), bytes);
+            store.store("trunc", os -> {
+                try (final FileInputStream fis = new FileInputStream(tmp)) {
+                    ByteStreams.copy(fis, os);
+                }
+                return null;
+            });
+        } finally {
+            tmp.delete();
+        }
+
+        final HashedBlob meta = store.fullMetadata("trunc").backingStore;
+        Assert.assertEquals(realLength, meta.originalLength);
+
+        final int expectedLengthAfterCompression = 32856;
+        Assert.assertEquals(expectedLengthAfterCompression, meta.storedLength);
     }
 }
