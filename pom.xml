@@ -4,7 +4,7 @@
 
     <groupId>com.goeswhere</groupId>
     <artifactId>bloboperations</artifactId>
-    <version>0.5</version>
+    <version>0.6</version>
     <licenses>
         <license>
             <name>Apache License, Version 2.0</name>
