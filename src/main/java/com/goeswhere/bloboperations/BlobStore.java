@@ -46,7 +46,7 @@ public class BlobStore<EX> {
         this.metadataTableName = metadataTableName;
         selectFullMetadata = "SELECT key, created, " + metadataTableName + ".hash, extra, original_length, stored_length, loid" +
                 " FROM " + metadataTableName + " INNER JOIN " + storage.blobTableName +
-                " ON (" + metadataTableName + ".hash=" + storage.blobTableName +".hash) ";
+                " ON (" + metadataTableName + ".hash=" + storage.blobTableName + ".hash) ";
     }
 
     public static <T> BlobStore<T> forDatasource(DataSource ds) {
@@ -169,14 +169,14 @@ public class BlobStore<EX> {
         final Long sum = storage.jdbc.queryForObject("SELECT SUM(stored_length)" +
                 " FROM " + storage.blobTableName +
                 " INNER JOIN " + metadataTableName + "" +
-                " ON (" + metadataTableName + ".hash=" + storage.blobTableName +".hash)" +
+                " ON (" + metadataTableName + ".hash=" + storage.blobTableName + ".hash)" +
                 " WHERE key LIKE ?", new Object[]{directory + "%"}, Long.class);
         return null != sum ? sum : 0;
     }
 
     public boolean exists(String key) {
         return storage.jdbc.queryForObject("SELECT EXISTS (SELECT NULL   FROM " + metadataTableName + " WHERE key=?)",
-                new Object[] { key },
+                new Object[]{key},
                 Boolean.class);
     }
 

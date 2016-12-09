@@ -165,7 +165,7 @@ public class HashedBlobStorage {
             // dbOs doesn't like being closed, so we'll just flush it and close it outside
             try (final CountingOutputStream countingToDb = new CountingOutputStream(new BlockCloseOutputStream(dbOs));
                  final CountingOutputStream countingFromCaller = new CountingOutputStream(
-                    new DigestOutputStream(storageFilter.output(countingToDb), digest))) {
+                         new DigestOutputStream(storageFilter.output(countingToDb), digest))) {
 
                 stream.accept(countingFromCaller);
                 countingFromCaller.flush();
