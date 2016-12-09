@@ -157,7 +157,7 @@ BlobOperations does some slightly strange dances to attempt
  you are concerned about this kind of performance, you should
  measure this in your environment, and let me know the results!
 
-For example, if one applications is busy writing to a specific
+For example, if one application is busy writing to a specific
  key, and another application comes to write to that key, you
  might expect:
 
